@@ -1,0 +1,10 @@
+{
+  "extends": ["airbnb-base", "airbnb-typescript/base"],
+  "plugins": ["prettier"],
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  },
+  "rules": {
+    "class-methods-use-this": "off"
+  }
+}
