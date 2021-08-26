@@ -6,6 +6,8 @@ A framework for creating clonable project templates that still compile
 
 This is a proof of concept right now and will be unstable until it's first release. There will be breaking changes as it grows, but I think there is some potential here.
 
+[Example template](https://github.com/johnkahn/TemplateTest)
+
 ## Motivation
 
 I've used [Cookiecutter](http://cookiecutter.readthedocs.io) in projects before, but it always bummed me out that when I wanted to populate variables in code the syntax would cause the template to no longer compile. This made it hard to maintain these templates as time went on. You would need to make the changes you wanted to and then clone the template to test it.
