@@ -14,10 +14,10 @@ import {
   PromptStep,
   DeriveStep,
   ActionStep,
-  DefaultValues,
   ConfirmOptions,
   RunStep,
   LogStep,
+  KeyOptions,
 } from './types';
 import { createLineTransformStream } from './utils/createLineTransformStream';
 import { ExpectedError } from 'clime';
@@ -45,7 +45,8 @@ interface FraternalBeforeSetup<Values> {
 
   derive<Key extends string, Value>(
     key: Key,
-    fn: (ctx: Context<Values>) => Value
+    fn: (ctx: Context<Values>) => Value,
+    options?: KeyOptions
   ): FraternalBeforeSetup<
     {
       [K in keyof (Values & { [K in Key]: Value })]: (Values & { [K in Key]: Value })[K];
@@ -74,7 +75,9 @@ type FraternalCommands<Values> = FraternalAfterSetup<Values> & FraternalBeforeSe
 export interface Fraternal<Values> extends FraternalCommands<Values> {
   _steps: Step[];
   _options: FraternalOptions;
-  _values: DefaultValues & Record<string, any>;
+  _values: Record<string, any>;
+  _valueSearchTexts: Record<string, string>;
+  _projectName: string;
   _hasBeenSetup: boolean;
   _projectPath: string;
   createContext(): Context<Values>;
@@ -89,7 +92,7 @@ export interface Fraternal<Values> extends FraternalCommands<Values> {
 
 type FraternalFn<Return> = (options?: Partial<FraternalOptions>) => Return;
 
-const Fraternal = function <Values extends DefaultValues>(options?: Partial<FraternalOptions>): Fraternal<Values> {
+const Fraternal = function <Values extends object>(options?: Partial<FraternalOptions>): Fraternal<Values> {
   const _options: FraternalOptions = {
     getSearchText: (key) => `__${key}__`,
     ...options,
@@ -98,7 +101,9 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
   return {
     _options,
     _steps: [],
-    _values: { projectName: '' },
+    _values: {},
+    _valueSearchTexts: {},
+    _projectName: '',
     _hasBeenSetup: false,
     _projectPath: '',
 
@@ -114,11 +119,12 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
       this._steps.push({
         type: 'prompt',
         key,
-        default: options?.default,
         question: {
           type: 'input',
           message,
         },
+        default: options?.default,
+        keyOptions: options,
       });
 
       return this as Fraternal<
@@ -140,11 +146,12 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
       this._steps.push({
         type: 'prompt',
         key,
-        default: options?.default,
         question: {
           type: 'confirm',
           message,
         },
+        default: options?.default,
+        keyOptions: options,
       });
 
       return this as Fraternal<
@@ -156,7 +163,8 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
 
     derive: function <Key extends string, Value>(
       key: Key,
-      fn: (ctx: Context<Values>) => Value
+      fn: (ctx: Context<Values>) => Value,
+      options?: KeyOptions
     ): Fraternal<
       {
         [K in keyof (Values & { [K in Key]: Value })]: (Values & { [K in Key]: Value })[K];
@@ -166,6 +174,7 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
         type: 'derive',
         key,
         fn,
+        keyOptions: options,
       });
 
       return this as Fraternal<
@@ -213,6 +222,7 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
       return {
         chalk,
         values: { ...this._values } as Values,
+        projectName: this._projectName,
       };
     },
 
@@ -223,8 +233,8 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
         message: 'Project name',
       });
 
-      this._values.projectName = projectName;
-      this._projectPath = path.join(cwd, this._values.projectName);
+      this._projectName = projectName;
+      this._valueSearchTexts.projectName = this._projectPath = path.join(cwd, this._projectName);
 
       for (const step of this._steps) {
         if (step.type === 'setupFiles') {
@@ -273,7 +283,7 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
             const writeStream = fs.createWriteStream(newPath);
             const transformStream = createLineTransformStream((line) =>
               Object.entries(this._values).reduce(
-                (acc, [key, value]) => acc.replace(this._options.getSearchText(key), value.toString()),
+                (acc, [key, value]) => acc.split(this._valueSearchTexts[key]).join(value.toString()),
                 line
               )
             );
@@ -301,25 +311,35 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
       });
     },
 
-    executePromptStep: async function ({ key, default: def, question }: PromptStep): Promise<void> {
+    executePromptStep: async function ({ key, ...step }: PromptStep): Promise<void> {
       let defaultValue: any;
-      if (typeof def === 'function') {
-        defaultValue = def(this.createContext());
+      if (typeof step.default === 'function') {
+        defaultValue = step.default(this.createContext());
       } else {
-        defaultValue = def;
+        defaultValue = step.default;
       }
 
       const answers = await inquirer.prompt({
-        ...question,
+        ...step.question,
         name: key,
         default: defaultValue,
       });
 
       this._values[key] = answers[key];
+      this._valueSearchTexts[key] = step.keyOptions?.searchText ?? this._options.getSearchText(key);
+
+      if (step.keyOptions?.transform) {
+        this._values[key] = step.keyOptions.transform(this._values[key]);
+      }
     },
 
-    executeDeriveStep: async function ({ key, fn }: DeriveStep): Promise<void> {
-      this._values[key] = await fn(this.createContext());
+    executeDeriveStep: async function ({ key, ...step }: DeriveStep): Promise<void> {
+      this._values[key] = await step.fn(this.createContext());
+      this._valueSearchTexts[key] = step.keyOptions?.searchText ?? this._options.getSearchText(key);
+
+      if (step.keyOptions?.transform) {
+        this._values[key] = step.keyOptions.transform(this._values[key]);
+      }
     },
 
     executeActionStep: async function ({ fn }: ActionStep): Promise<void> {
@@ -365,6 +385,4 @@ const Fraternal = function <Values extends DefaultValues>(options?: Partial<Frat
   };
 };
 
-export const Config = Fraternal as unknown as FraternalFn<
-  FraternalBeforeSetup<{ [K in keyof DefaultValues]: DefaultValues[K] }>
->;
+export const Config = Fraternal as unknown as FraternalFn<FraternalBeforeSetup<{}>>;
