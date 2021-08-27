@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
-    "incremental": true,
     "target": "es6",
     "module": "commonjs",
     "lib": ["esnext"],
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
     "outDir": "dist",
     "isolatedModules": true,
     "strict": true,
