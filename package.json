@@ -1,7 +1,7 @@
 {
   "name": "fraternal",
-  "version": "0.1.1",
-  "description": "A framework for creating clonable project templates that still compile",
+  "version": "0.1.2",
+  "description": "🐑 A framework for creating clone-able project templates that still compile",
   "main": "dist/index.js",
   "author": "John Kahn",
   "license": "MIT",
@@ -50,12 +50,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/fraternal-cli/cowsay-template.git"
+    "url": "https://github.com/fraternal-cli/fraternal.git"
   },
   "bugs": {
-    "url": "https://github.com/fraternal-cli/cowsay-template/issues"
+    "url": "https://github.com/fraternal-cli/fraternal/issues"
   },
-  "homepage": "https://github.com/fraternal-cli/cowsay-template#readme",
+  "homepage": "https://github.com/fraternal-cli/fraternal#readme",
   "keywords": [
     "fraternal",
     "template",
